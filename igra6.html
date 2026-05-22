@@ -1,0 +1,236 @@
+<!-- 021 GeoGuessr - CMS-safe embed verzija -->
+<!-- Leaflet CSS - učitava se samo ako već nije učitan -->
+<link rel="stylesheet" id="leaflet-css-021" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<div id="ns021-root">
+<style>
+  /* Svi stilovi su scopovani na #ns021-root da ne gaze temu sajta */
+  #ns021-root * { box-sizing: border-box; }
+  #ns021-root {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    text-align: center;
+    margin: 0 auto;
+    padding: 0;
+    max-width: 820px;
+  }
+  #ns021-root .g021-wrap {
+    background: #fff;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  #ns021-root h2.g021-title {
+    font-size: 20px;
+    color: #222;
+    margin: 0 0 12px 0;
+  }
+  #ns021-root .g021-img-wrap {
+    width: 100%;
+    height: 360px;
+    background: #eee;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ccc;
+  }
+  #ns021-root .g021-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  #ns021-root #g021-map {
+    height: 380px;
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    cursor: crosshair;
+    z-index: 1;
+  }
+  #ns021-root .g021-result-box {
+    margin-top: 15px;
+    min-height: 80px;
+  }
+  #ns021-root .g021-feedback {
+    font-size: 24px;
+    font-weight: bold;
+    color: #e30613;
+    margin-bottom: 4px;
+  }
+  #ns021-root .g021-dist {
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: #444;
+  }
+  #ns021-root .g021-score {
+    font-size: 18px;
+    color: #444;
+    font-weight: bold;
+  }
+  #ns021-root .g021-btn {
+    display: inline-block;
+    background: #e30613;
+    color: #fff;
+    border: none;
+    padding: 14px 30px;
+    font-size: 17px;
+    border-radius: 30px;
+    cursor: pointer;
+    margin-top: 18px;
+    font-weight: bold;
+    transition: background 0.2s, transform 0.15s;
+  }
+  #ns021-root .g021-btn:hover {
+    background: #b3050f;
+    transform: scale(1.03);
+  }
+  #ns021-root .g021-end {
+    padding: 30px 10px;
+  }
+  #ns021-root .g021-end h2 {
+    font-size: 26px;
+    color: #222;
+    margin-bottom: 8px;
+  }
+  #ns021-root .g021-end h1 {
+    font-size: 52px;
+    color: #e30613;
+    margin: 0 0 10px 0;
+  }
+  #ns021-root .g021-end p {
+    color: #555;
+    font-size: 16px;
+  }
+</style>
+
+<div class="g021-wrap">
+  <h2 class="g021-title" id="g021-round">Runda 1/10</h2>
+  <div class="g021-img-wrap">
+    <img id="g021-photo" src="" alt="Učitavanje...">
+  </div>
+  <div id="g021-map"></div>
+  <div class="g021-result-box">
+    <div class="g021-feedback" id="g021-feedback"></div>
+    <div class="g021-dist" id="g021-dist"></div>
+    <div class="g021-score" id="g021-score">Ukupni poeni: 0</div>
+  </div>
+  <button class="g021-btn" id="g021-next" style="display:none;">Sledeća lokacija</button>
+</div>
+</div>
+
+<!-- Leaflet JS -->
+<script>
+(function() {
+  // Učitaj Leaflet ako već nije prisutan
+  function initGame() {
+    var L = window.L;
+
+    var lokacije = [
+      { coords: [45.25146279038994, 19.837050264693534], img: "https://i.postimg.cc/vmQCy7Rw/1.jpg" },
+      { coords: [45.25795692814722, 19.843914183393096], img: "https://i.postimg.cc/QMdsmZd4/2.jpg" },
+      { coords: [45.25727397453207, 19.854574042341827], img: "https://i.postimg.cc/02Gsqy6z/3.jpg" },
+      { coords: [45.25708488568909, 19.851987296997347], img: "https://i.postimg.cc/2SHgzbCK/4.jpg" },
+      { coords: [45.228261781481024, 19.896550216216802], img: "https://i.postimg.cc/MZy4nrWG/5.jpg" },
+      { coords: [45.258860610513025, 19.844321038892648], img: "https://i.postimg.cc/P5N2Q6kS/6.jpg" },
+      { coords: [45.24583212839784, 19.84655016247984], img: "https://i.postimg.cc/QdWcMv3Q/7.jpg" },
+      { coords: [45.23358603707778, 19.88476530831237], img: "https://i.postimg.cc/brB2y9Fp/8.jpg" },
+      { coords: [45.241718742776165, 19.845560796760598], img: "https://i.postimg.cc/0Q567BLc/9.jpg" },
+      { coords: [45.249726326287885, 19.82876301613048], img: "https://i.postimg.cc/zf7vDkV9/10.jpg" }
+    ];
+
+    var trenutna = 0, ukupniScore = 0, kliknuto = false;
+
+    // Uništi staru instancu mape ako postoji (važno kod hot-reload u CMS-u)
+    var mapEl = document.getElementById('g021-map');
+    if (mapEl && mapEl._leaflet_id) {
+      mapEl._leaflet_id = null;
+      mapEl.innerHTML = '';
+    }
+
+    var map = L.map('g021-map', { attributionControl: false }).setView([45.2671, 19.8335], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+    var markerLayer = L.layerGroup().addTo(map);
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1000;
+    }
+
+    function ucitajLokaciju() {
+      markerLayer.clearLayers();
+      document.getElementById('g021-feedback').innerHTML = '';
+      document.getElementById('g021-dist').innerHTML = '';
+      document.getElementById('g021-next').style.display = 'none';
+      document.getElementById('g021-round').innerHTML = 'Runda ' + (trenutna + 1) + '/10';
+      document.getElementById('g021-photo').src = lokacije[trenutna].img;
+      map.setView([45.2671, 19.8335], 12);
+      kliknuto = false;
+    }
+
+    map.on('click', function(e) {
+      if (kliknuto) return;
+      kliknuto = true;
+
+      var dist = haversine(e.latlng.lat, e.latlng.lng, lokacije[trenutna].coords[0], lokacije[trenutna].coords[1]);
+      var rundaScore = Math.round(5000 * Math.pow(Math.E, -dist / 600));
+      ukupniScore += rundaScore;
+
+      L.marker(e.latlng).addTo(markerLayer).bindPopup('Tvoj izbor').openPopup();
+      L.marker(lokacije[trenutna].coords).addTo(markerLayer).bindPopup('Tačno!');
+      L.polyline([e.latlng, lokacije[trenutna].coords], {
+        color: '#e30613', weight: 2, dashArray: '5,10'
+      }).addTo(markerLayer);
+
+      var fg = L.featureGroup([L.marker(e.latlng), L.marker(lokacije[trenutna].coords)]);
+      map.fitBounds(fg.getBounds().pad(0.3));
+
+      var poruka = dist < 50  ? 'SVAKA ČAST! ✨' :
+                   dist < 150 ? 'ODLIČNO! 👌' :
+                   dist < 450 ? 'DOBRO JE! 👍' :
+                                'UH, PROMAŠAJ... 😅';
+
+      document.getElementById('g021-feedback').innerHTML = poruka;
+      document.getElementById('g021-dist').innerHTML = 'Promašaj: ' + Math.round(dist) + ' m (+' + rundaScore + ' poena)';
+      document.getElementById('g021-score').innerHTML = 'Ukupni poeni: ' + ukupniScore;
+      document.getElementById('g021-next').style.display = 'inline-block';
+      if (trenutna === 9) document.getElementById('g021-next').innerHTML = 'Završi igru';
+    });
+
+    document.getElementById('g021-next').onclick = function() {
+      trenutna++;
+      if (trenutna >= 10) {
+        var root = document.getElementById('ns021-root');
+        root.innerHTML =
+          '<div class="g021-wrap g021-end">' +
+          '<h2>KRAJ IGRE!</h2>' +
+          '<h1>' + ukupniScore + '</h1>' +
+          '<p>Hvala što igraš uz 021!</p>' +
+          '<button class="g021-btn" onclick="location.reload()">Igraj ponovo</button>' +
+          '</div>';
+        return;
+      }
+      ucitajLokaciju();
+    };
+
+    ucitajLokaciju();
+  }
+
+  // Ako je Leaflet već učitan, odmah pokreni. Ako nije, sačekaj.
+  if (window.L) {
+    initGame();
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = initGame;
+    document.head.appendChild(s);
+  }
+})();
+</script>
